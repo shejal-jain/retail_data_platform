@@ -1,7 +1,9 @@
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
 
 def fetch_news(api_key):
-    #Address of the data source along with API key
     url = "https://newsapi.org/v2/top-headlines"
 
     params = {
@@ -12,26 +14,33 @@ def fetch_news(api_key):
         "X-Api-Key": api_key
     }
 
-#Sending request to the API
+    # Start API request
+    logger.info("Starting API request to fetch news data")
+
     response = requests.get(url, params=params, headers=headers)
 
-    #Check if request succeeded
-    if response.status_code != 200:
-        print(f"API request failed with status code {response.status_code}")
-        exit()
+    # Log status code
+    logger.info(f"API response status code: {response.status_code}")
 
-    #Converts API response to json text
+    # Handle failure
+    if response.status_code != 200:
+        logger.error(f"API request failed with status code {response.status_code}")
+        raise Exception(f"API request failed with status code {response.status_code}")
+
     data = response.json()
-    
-    #Check if articles key exist
+
+    # Validate response
     if "articles" not in data:
+        logger.error("No 'articles' key found in API response")
         raise Exception("No 'articles' key found in API response")
-    
-    # Extract the articles list
+
     articles = data["articles"]
 
-    # Check if articles list is empty
     if not articles:
+        logger.warning("API returned 0 articles")
         raise Exception("API returned 0 articles")
+
+    # Success log
+    logger.info(f"Number of articles fetched: {len(articles)}")
 
     return data

@@ -1,7 +1,7 @@
 import sys
 sys.path.insert(0, "/opt/airflow")
 import os
-
+import logging
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime
@@ -12,24 +12,28 @@ from news_data_pipeline.storage.save_raw import save_raw
 from news_data_pipeline.transformation.clean_articles import clean_articles_data
 from news_data_pipeline.storage.save_processed import save_processed
 from news_data_pipeline.db.load_postgres import load_postgres
+from news_data_pipeline.logging_config import setup_logging
 from pathlib import Path
 import json
 
 
 load_dotenv()
+logger = logging.getLogger(__name__)
+setup_logging()
+
 
 def fetch_and_save_raw():
     api_key = os.getenv("NEWS_API_KEY")
     data = fetch_news(api_key)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     file_path = save_raw(data,timestamp)
-    print("Fetched and saved raw data")
+    logger.info("Fetched and saved raw data")
     return str(file_path)
 
 def clean_and_save_processed(ti):
     # Get file path from Task 1 (XCom)
     raw_file_path = ti.xcom_pull(task_ids="fetch_and_save_raw")
-    print(f"Reading raw file: {raw_file_path}")
+    logger.info(f"Reading raw file: {raw_file_path}")
 
     with open(raw_file_path, "r") as f:
         data = json.load(f)
@@ -44,16 +48,16 @@ def clean_and_save_processed(ti):
 
     processed_file_path = save_processed(clean_articles, timestamp)
 
-    print("Processed data saved.")
+    logger.info("Processed data saved.")
     return str(processed_file_path)
 
 def load_to_postgres(ti):
-    processed_dir = Path('/opt/airflow/news_data_pipeline/data/processed')
+    #processed_dir = Path('/opt/airflow/news_data_pipeline/data/processed')
     
     #Get latest processed file
     # Get file path from Task 1 (XCom)
     processed_file_path = ti.xcom_pull(task_ids="clean_and_save_processed")
-    print(f"Reading processed file: {processed_file_path}")
+    logger.info(f"Reading processed file: {processed_file_path}")
 
     with open(processed_file_path,"r") as f:
         clean_articles = json.load(f)
