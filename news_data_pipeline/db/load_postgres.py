@@ -15,10 +15,10 @@ def load_postgres(clean_articles):
         logger.info("Connecting to PostgreSQL database")
 
         conn = psycopg2.connect(
-            host="host.docker.internal",
-            database="news_pipeline_db",
-            user="postgres",
-            password=db_password
+            host=os.getenv("DB_HOST"),
+            database=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
         )
 
         cursor = conn.cursor()
@@ -35,6 +35,15 @@ def load_postgres(clean_articles):
         ]
 
         logger.info(f"Inserting {len(rows)} records into database")
+        create_table_query = """
+        CREATE TABLE IF NOT EXISTS news_articles (
+            title TEXT,
+            author TEXT,
+            published_at TIMESTAMP,
+            url TEXT UNIQUE
+        );
+        """
+        cursor.execute(create_table_query)
 
         insert_query = """
         INSERT INTO news_articles (title,author,published_at,url)

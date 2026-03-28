@@ -1,13 +1,16 @@
 import requests
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
+
 def fetch_news(api_key):
     url = "https://newsapi.org/v2/top-headlines"
-
+    country = os.getenv("COUNTRY")
+    
     params = {
-        "country": "us"
+        "country": country
     }
 
     headers = {
@@ -16,6 +19,7 @@ def fetch_news(api_key):
 
     # Start API request
     logger.info("Starting API request to fetch news data")
+    logger.info(f"Fetching news for country: {country}")
 
     response = requests.get(url, params=params, headers=headers)
 

@@ -13,6 +13,7 @@ from news_data_pipeline.transformation.clean_articles import clean_articles_data
 from news_data_pipeline.storage.save_processed import save_processed
 from news_data_pipeline.db.load_postgres import load_postgres
 from news_data_pipeline.logging_config import setup_logging
+from datetime import timedelta
 from pathlib import Path
 import json
 
@@ -66,11 +67,17 @@ def load_to_postgres(ti):
 
     print("Data loaded to PostgreSQL")
 
+default_args = {
+    "retries":1,
+    "retry_delay":timedelta(minutes=1)
+}
+
 with DAG(
     dag_id="news_pipeline_dag",
     start_date=datetime(2024,1,1),
     schedule_interval=None,
-    catchup=False
+    catchup=False,
+    default_args=default_args
 )as dag:
     
     fetch_raw = PythonOperator(
