@@ -9,8 +9,8 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__FERNET_KEY: ''
     AIRFLOW__WEBSERVER__SECRET_KEY: 'secret_key'
   volumes:
-    - ./news_data_pipeline/dags:/opt/airflow/dags
-    - ./news_data_pipeline:/opt/airflow/news_data_pipeline
+    - ./dags:/opt/airflow/dags 
+    - ./retail_data_platform:/opt/airflow/retail_data_platform
     - ./logs:/opt/airflow/logs
     - ./config:/opt/airflow/config
     - ./plugins:/opt/airflow/plugins
@@ -44,7 +44,7 @@ services:
       bash -c "
       airflow db init &&
       airflow users create
-      --username admin
+      --username admin  
       --password admin
       --firstname admin
       --lastname admin
