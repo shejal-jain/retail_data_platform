@@ -13,38 +13,76 @@ def build_source_path(run_id):
     return os.path.join(BASE_SOURCE_PATH, "products", file_name)
 
 
-def step_generate(source_file):
+def step_generate(source_file, run_id):
+    logger.info(f"[RUN_ID={run_id}] [STEP: GENERATE] START")
+
     try:
         if os.path.exists(source_file):
-            logger.info(f"Skipping generation: {source_file}")
+            logger.info(f"[RUN_ID={run_id}] File exists, skipping: {source_file}")
+            logger.info(f"[RUN_ID={run_id}] [STEP: GENERATE] SKIPPED")
             return
 
-        generate_products_csv(source_file, n=15)
+        logger.info(f"[RUN_ID={run_id}] Generating CSV at {source_file}")
+        generate_products_csv(source_file, n=20)
+
+        logger.info(f"[RUN_ID={run_id}] [STEP: GENERATE] SUCCESS")
 
     except Exception as e:
-        logger.error(f"Generate failed: {str(e)}")
+        logger.error(f"[RUN_ID={run_id}] [STEP: GENERATE] FAILED: {str(e)}")
         raise
 
 
-def step_read(source_file):
+def step_read(source_file, run_id, logical_date):
+    logger.info(f"[RUN_ID={run_id}] [STEP: READ] START")
+
     try:
-        return read_csv(source_file)
+        data = read_csv(source_file)
+
+        staging_path = save_json(
+            data=data,
+            base_path=BASE_DATA_LAKE_PATH,
+            entity=f"{PRODUCTS}_staging",
+            run_id=run_id,
+            logical_date=logical_date
+        )
+
+        logger.info(f"[RUN_ID={run_id}] Wrote staging to {staging_path}")
+        logger.info(f"[RUN_ID={run_id}] [STEP: READ] SUCCESS")
+
+        return staging_path
+    
     except Exception as e:
-        logger.error(f"Read failed: {str(e)}")
+        logger.error(f"[RUN_ID={run_id}] [STEP: READ] FAILED: {str(e)}")
         raise
 
 
 def step_save(data, run_id, logical_date):
+    logger.info(f"[RUN_ID={run_id}] [STEP: SAVE] START")
+
     try:
-        save_json(data, BASE_DATA_LAKE_PATH, PRODUCTS, run_id, logical_date)
+        file_path = save_json(
+            data=data,
+            base_path=BASE_DATA_LAKE_PATH,
+            entity=PRODUCTS,
+            run_id=run_id,
+            logical_date=logical_date
+        )
+
+        logger.info(f"[RUN_ID={run_id}] Saved to {file_path}")
+        logger.info(f"[RUN_ID={run_id}] [STEP: SAVE] SUCCESS")
+
     except Exception as e:
-        logger.error(f"Save failed: {str(e)}")
+        logger.error(f"[RUN_ID={run_id}] [STEP: SAVE] FAILED: {str(e)}")
         raise
 
 
 def run_products_ingestion(run_id, logical_date):
+    logger.info(f"========== RUN START | run_id={run_id} ==========")
+
     source_file = build_source_path(run_id)
 
-    step_generate(source_file)
-    data = step_read(source_file)
-    step_save(data,run_id, logical_date)
+    step_generate(source_file, run_id)
+    data = step_read(source_file, run_id)
+    step_save(data, run_id, logical_date)
+
+    logger.info(f"========== RUN END | run_id={run_id} ==========")

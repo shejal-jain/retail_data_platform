@@ -13,4 +13,10 @@ CUSTOMERS = "customers"
 PRODUCTS = "products"
 
 # Allowed entities (validation)
-ALLOWED_ENTITIES = [ORDERS, CUSTOMERS, PRODUCTS]
+ALLOWED_ENTITIES = [
+    "customers",
+    "products",
+    "orders",
+    "customers_staging",
+    "products_staging"
+]

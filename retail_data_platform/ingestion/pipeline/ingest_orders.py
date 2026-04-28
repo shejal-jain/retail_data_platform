@@ -6,13 +6,21 @@ from retail_data_platform.ingestion.utils.logger import get_logger
 logger = get_logger("ingest_orders")
 
 
-def step_generate():
-    try:
-        return generate_orders(50)
-    except Exception as e:
-        logger.error(f"Generate failed: {str(e)}")
-        raise
+def step_generate(run_id):
+    logger.info(f"[RUN_ID={run_id}] [STEP: GENERATE] START")
 
+    try:
+        data = generate_orders(50)
+
+        logger.info(f"[RUN_ID={run_id}] Generated {len(data)} records")
+        logger.info(f"[RUN_ID={run_id}] [STEP: GENERATE] SUCCESS")
+
+        return data
+
+    except Exception as e:
+        logger.error(f"[RUN_ID={run_id}] [STEP: GENERATE] FAILED: {str(e)}")
+        raise
+    
 
 def step_save(data,run_id, logical_date):
     try:

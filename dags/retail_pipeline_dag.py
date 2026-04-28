@@ -1,24 +1,45 @@
 import sys
-sys.path.insert(0,"/opt/airflow")
+sys.path.insert(0, "/opt/airflow")
+
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-
 from datetime import datetime
 
-# Import your existing pipeline functions
-from retail_data_platform.ingestion.pipeline.ingest_customers import run_customers_ingestion
-from retail_data_platform.ingestion.pipeline.ingest_products import run_products_ingestion
-from retail_data_platform.ingestion.pipeline.ingest_orders import run_orders_ingestion
+# -----------------------------
+# Customers Imports
+# -----------------------------
+from retail_data_platform.ingestion.pipeline.ingest_customers import (
+    step_generate as customers_generate,
+    step_read as customers_read,
+    step_save as customers_save,
+    build_source_path as customers_source_path
+)
+
+# -----------------------------
+# Products Imports
+# -----------------------------
+from retail_data_platform.ingestion.pipeline.ingest_products import (
+    step_generate as products_generate,
+    step_read as products_read,
+    step_save as products_save,
+    build_source_path as products_source_path
+)
+
+# -----------------------------
+# Orders Imports
+# -----------------------------
+from retail_data_platform.ingestion.pipeline.ingest_orders import (
+    step_generate as orders_generate,
+    step_save as orders_save
+)
 
 
-# Default arguments for DAG
 default_args = {
     "owner": "retail_pipeline",
-    "retries": 1,  # retry once if task fails
+    "retries": 1,
 }
 
 
-# Define DAG
 with DAG(
     dag_id="retail_data_pipeline",
     default_args=default_args,
@@ -27,60 +48,143 @@ with DAG(
     catchup=False
 ) as dag:
 
-    # -----------------------------
-    # Customers Task
-    # -----------------------------
-    def customers_task(**context):
-        """
-        Wrapper function:
-        - Gets run_id from Airflow
-        - Calls your ingestion function
-        """
+    # ============================================
+    # CUSTOMERS TASKS
+    # ============================================
+
+    def customers_generate_task(**context):
+        run_id = context["run_id"]
+
+        source_file = customers_source_path(run_id)
+        customers_generate(source_file, run_id)
+
+        return source_file
+
+
+    def customers_read_task(**context):
         run_id = context["run_id"]
         logical_date = context["logical_date"]
-        run_customers_ingestion(run_id, logical_date)
+
+        source_file = context["ti"].xcom_pull(task_ids="customers_generate")
+        staging_path = customers_read(source_file, run_id, logical_date)
+
+        return staging_path
 
 
-    customers = PythonOperator(
-        task_id="customers_ingestion",
-        python_callable=customers_task
+    def customers_save_task(**context):
+        run_id = context["run_id"]
+        logical_date = context["logical_date"]
+
+        staging_path = context["ti"].xcom_pull(task_ids="customers_read")
+
+        customers_save(staging_path, run_id, logical_date)
+
+
+    customers_generate_op = PythonOperator(
+        task_id="customers_generate",
+        python_callable=customers_generate_task
+    )
+
+    customers_read_op = PythonOperator(
+        task_id="customers_read",
+        python_callable=customers_read_task
+    )
+
+    customers_save_op = PythonOperator(
+        task_id="customers_save",
+        python_callable=customers_save_task
     )
 
 
-    # -----------------------------
-    # Products Task
-    # -----------------------------
-    def products_task(**context):
+    # ============================================
+    # PRODUCTS TASKS
+    # ============================================
+
+    def products_generate_task(**context):
+        run_id = context["run_id"]
+
+        source_file = products_source_path(run_id)
+        products_generate(source_file, run_id)
+
+        return source_file
+
+
+    def products_read_task(**context):
         run_id = context["run_id"]
         logical_date = context["logical_date"]
-        run_products_ingestion(run_id, logical_date)
+
+        source_file = context["ti"].xcom_pull(task_ids="products_generate")
+        staging_path = products_read(source_file, run_id, logical_date)
+
+        return staging_path
 
 
-    products = PythonOperator(
-        task_id="products_ingestion",
-        python_callable=products_task
+    def products_save_task(**context):
+        run_id = context["run_id"]
+        logical_date = context["logical_date"]
+
+        data = context["ti"].xcom_pull(task_ids="products_read")
+
+        products_save(data, run_id, logical_date)
+
+
+    products_generate_op = PythonOperator(
+        task_id="products_generate",
+        python_callable=products_generate_task
+    )
+
+    products_read_op = PythonOperator(
+        task_id="products_read",
+        python_callable=products_read_task
+    )
+
+    products_save_op = PythonOperator(
+        task_id="products_save",
+        python_callable=products_save_task
     )
 
 
-    # -----------------------------
-    # Orders Task
-    # -----------------------------
-    def orders_task(**context):
+    # ============================================
+    # ORDERS TASKS
+    # ============================================
+
+    def orders_generate_task(**context):
+        run_id = context["run_id"]
+
+        data = orders_generate(run_id)
+        return data
+
+
+    def orders_save_task(**context):
         run_id = context["run_id"]
         logical_date = context["logical_date"]
-        run_orders_ingestion(run_id, logical_date)
+
+        data = context["ti"].xcom_pull(task_ids="orders_generate")
+
+        orders_save(data, run_id, logical_date)
 
 
-    orders = PythonOperator(
-        task_id="orders_ingestion",
-        python_callable=orders_task
+    orders_generate_op = PythonOperator(
+        task_id="orders_generate",
+        python_callable=orders_generate_task
+    )
+
+    orders_save_op = PythonOperator(
+        task_id="orders_save",
+        python_callable=orders_save_task
     )
 
 
-    # -----------------------------
-    # Task Dependencies
-    # -----------------------------
+    # ============================================
+    # DEPENDENCIES
+    # ============================================
 
-    # Customers and Products run in parallel
-    # Orders runs after both complete
-    [customers, products] >> orders
+    # Customers
+    customers_generate_op >> customers_read_op >> customers_save_op
+
+    # Products
+    products_generate_op >> products_read_op >> products_save_op
+
+    # Orders
+    [customers_save_op, products_save_op] >> orders_generate_op
+    orders_generate_op >> orders_save_op
