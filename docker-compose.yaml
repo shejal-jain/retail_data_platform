@@ -28,6 +28,18 @@ services:
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
 
+  postgres_retail:
+    image: postgres:13
+    container_name: retail_postgres
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: retail_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-retail-volume:/var/lib/postgresql/data
+
   airflow-webserver:
     <<: *airflow-common
     command: webserver
@@ -54,3 +66,4 @@ services:
 
 volumes:
   postgres-db-volume:
+  postgres-retail-volume:

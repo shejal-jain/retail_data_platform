@@ -5,6 +5,7 @@ from airflow import DAG
 from airflow.operators.python import PythonOperator
 from datetime import datetime
 
+
 # -----------------------------
 # Customers Imports
 # -----------------------------
@@ -123,9 +124,9 @@ with DAG(
         run_id = context["run_id"]
         logical_date = context["logical_date"]
 
-        data = context["ti"].xcom_pull(task_ids="products_read")
+        staging_path = context["ti"].xcom_pull(task_ids="products_read")
 
-        products_save(data, run_id, logical_date)
+        products_save(staging_path, run_id, logical_date)
 
 
     products_generate_op = PythonOperator(
@@ -174,6 +175,37 @@ with DAG(
         python_callable=orders_save_task
     )
 
+     # ============================================
+    # Transformation tasks
+    # ============================================
+
+    from retail_data_platform.transformations.customer_sales import run_customer_sales
+
+    def customer_sales_task(**context):
+        run_id = context["run_id"]
+        logical_date = context["logical_date"]
+
+        return run_customer_sales(run_id, logical_date)
+
+    customer_sales_op = PythonOperator(
+        task_id = "customer_sales_transformation",
+        python_callable=customer_sales_task
+    )
+
+    #============================================
+    #Inserting customer sales data to POSTGRES
+    #=============================================
+
+    from retail_data_platform.ingestion.loaders.db_loader import load_customer_sales_to_db
+
+    def load_to_db_task(**context):
+        file_path = context["ti"].xcom_pull(task_ids="customer_sales_transformation")
+        load_customer_sales_to_db(file_path)
+
+    load_to_db_op = PythonOperator(
+        task_id = "load_customer_sales_to_db",
+        python_callable = load_to_db_task
+    )
 
     # ============================================
     # DEPENDENCIES
@@ -187,4 +219,7 @@ with DAG(
 
     # Orders
     [customers_save_op, products_save_op] >> orders_generate_op
-    orders_generate_op >> orders_save_op
+    orders_generate_op >> orders_save_op >> customer_sales_op
+
+    #Data insertion into Postgres
+    customer_sales_op >> load_to_db_op

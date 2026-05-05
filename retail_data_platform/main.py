@@ -13,3 +13,4 @@ def run_all():
     run_customers_ingestion(run_id, logical_date)
     run_products_ingestion(run_id, logical_date)
     run_orders_ingestion(run_id, logical_date)
+
