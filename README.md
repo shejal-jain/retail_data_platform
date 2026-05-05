@@ -1,172 +1,188 @@
-# News Data Pipeline 
+# Retail Data Pipeline (Airflow + Data Lake + PostgreSQL)
 
-> A batch news ingestion and processing pipeline built to enable downstream analysis of news trends, sentiment, and source diversity — triggered on-demand or on a schedule, orchestrated end-to-end with Apache Airflow.
+## 📌 Overview
 
----
+This project implements a **production-style end-to-end data pipeline** using Apache Airflow.
+It simulates a retail data platform that ingests, processes, validates, and stores data for analytics.
 
-## Objective
+The pipeline follows a layered architecture:
 
-Build a modular and reproducible data pipeline that:
-
-* Ingests news data from an external API
-* Processes and cleans raw data
-* Stores both raw and processed datasets
-* Loads structured data into a relational database
-* Automates the workflow using Airflow
-
----
-
-## Evolution of the Project
-
-### Phase 1 — Manual Pipeline Execution
-
-The pipeline was initially implemented using standalone Python scripts.
-
-Flow:
-
-1. Fetch news data from API
-2. Save raw JSON data
-3. Clean and transform articles
-4. Save processed data
-5. Load into PostgreSQL
-
-Execution:
-
-```bash
-python news_data_pipeline/scripts/ingest_news_api.py
+```
+Data Generation → Ingestion → Transformation → Data Lake → Database → Analytics
 ```
 
 ---
 
-### Phase 2 — Airflow Orchestration
+## 🚀 Features
 
-The pipeline was refactored and integrated with **Apache Airflow** for orchestration.
+* End-to-end pipeline orchestration using **Apache Airflow**
+* Modular ingestion pipelines (customers, products, orders)
+* **Idempotent processing** using `run_id`
+* Partitioned data lake structure (date-based)
+* Transformation layer with:
 
-#### DAG Tasks:
+  * Join logic (customers + orders)
+  * Aggregations (total orders, total revenue)
+  * Derived metrics (price × quantity)
+* **Data validation checks**
 
-1. `fetch_and_save_raw`
-2. `clean_and_save_processed`
-3. `load_to_postgres`
+  * Invalid records skipped (negative price, zero quantity)
+  * Logging of anomalies
+* **Data quality reporting**
 
-#### Improvements:
-
-* Task-based execution
-* Dependency management
-* Scheduling capability
-* Improved reliability
+  * Valid vs invalid records
+  * Invalid percentage tracking
+* PostgreSQL integration for analytics querying
+* XCom-based task communication (file path passing)
 
 ---
 
-## Project Structure
+## 🏗️ Architecture
 
-```text
+```
+                +------------------+
+                |   Airflow DAG    |
+                +--------+---------+
+                         |
+        -------------------------------------
+        |           |            |
+   Customers     Products      Orders
+   Pipeline      Pipeline      Pipeline
+        \           |            /
+         \          |           /
+          ----------+-----------
+                     |
+             Transformation Layer
+                     |
+          +----------+----------+
+          |                     |
+     Data Lake (JSON)     Data Quality Reports
+          |
+     PostgreSQL (Analytics Layer)
+```
+
+---
+
+## 📂 Project Structure
+
+```
 airflow_project/
 │
-├── docker-compose.yml
-├── README.md
-├── requirements.txt
-├── .env.example
+├── dags/
+│   └── retail_pipeline_dag.py
 │
-├── news_data_pipeline/
-│   ├── dags/
-│   │   └── news_pipeline_dag.py
+├── retail_data_platform/
+│   ├── config/
+│   │   └── config.py
+│   │
 │   ├── ingestion/
-│   ├── transformation/
-│   ├── storage/
-│   ├── db/
-│   ├── scripts/
-│   └── __init__.py
+│   │   ├── sources/        # Data generation
+│   │   ├── loaders/        # File + DB loaders
+│   │   ├── pipeline/       # Step-based ingestion logic
+│   │   └── utils/          # Logging utilities
+│   │
+│   ├── transformations/
+│   │   └── customer_sales.py
+│   │
+│   ├── data_source/        # Generated CSV files
+│   └── data_lake/
+│       ├── raw/
+│       └── analytics/
+│
+├── docker-compose.yaml
+├── requirements.txt
+└── README.md
 ```
 
 ---
 
-## Tech Stack
+## ⚙️ Setup Instructions
 
-| Layer            | Tool           |
-| ---------------- | -------------- |
-| Language         | Python         |
-| Orchestration    | Apache Airflow |
-| Containerisation | Docker         |
-| Database         | PostgreSQL     |
-| API Source       | NewsAPI        |
-| DB Connector     | psycopg2       |
+### 1. Clone Repository
 
----
-
-## Pipeline Flow
-
-```text
-NewsAPI
-  └── Ingestion (fetch_and_save_raw)
-        └── Transformation (clean_and_save_processed)
-              └── Storage (raw JSON + processed JSON)
-                    └── Load (load_to_postgres → PostgreSQL)
 ```
-
----
-
-## Engineering Concepts Applied
-
-* Modular pipeline design (ingestion, transformation, storage, db)
-* Airflow DAG orchestration and task dependencies
-* Docker-based environment setup
-* Volume mounting and container file access
-* Inter-container communication (Airflow ↔ PostgreSQL)
-* Environment-based configuration using `.env`
-* Deterministic pipelines using XCom for task communication
-
----
-
-## Running the Project
-
-### 1. Clone the repository
-
-```bash
-git clone <repo-url>
+git clone <your-repo-url>
 cd airflow_project
 ```
 
 ---
 
-### 2. Configure environment variables
+### 2. Start Services
 
-```bash
-cp .env.example .env
-cp news_data_pipeline/.env.example news_data_pipeline/.env
 ```
-
-Update values as required.
-
-> Do not commit `.env` files — they contain environment-specific configuration.
-
----
-
-### 3. Start Airflow
-
-```bash
-docker-compose up --build
+docker compose up -d
 ```
 
 ---
 
-### 4. Access Airflow UI
+### 3. Access Airflow UI
 
 ```
 http://localhost:8080
 ```
 
-Default credentials (for local development only):
+---
 
-* Username: admin
-* Password: admin
+### 4. Trigger DAG
+
+* Enable `retail_data_pipeline`
+* Click "Trigger DAG"
 
 ---
 
-## Outcomes
+## 🗄️ PostgreSQL Setup
 
-* Built an end-to-end batch data pipeline
-* Automated workflow using Airflow DAGs
-* Implemented modular and maintainable pipeline design
-* Containerised the system for reproducibility
+The project uses a separate PostgreSQL container for analytics:
+
+* Host: `postgres_retail`
+* Port: `5433`
+* Database: `retail_db`
+* User: `airflow`
+* Password: `airflow`
+
+### Connect to DB
+
+```
+docker exec -it retail_postgres psql -U airflow -d retail_db
+```
 
 ---
+
+## 📊 Example Query
+
+```
+SELECT customer_id, total_amount
+FROM customer_sales
+ORDER BY total_amount DESC;
+```
+
+---
+
+## 🔄 Pipeline Flow
+
+1. Generate data (CSV simulation)
+2. Read and validate data
+3. Save raw data to data lake
+4. Perform transformation:
+
+   * Join customers and orders
+   * Calculate metrics
+5. Save analytics output
+6. Generate data quality report
+7. Load results into PostgreSQL
+
+---
+
+## 🧠 Key Concepts Demonstrated
+
+* Airflow DAG orchestration
+* Idempotent pipeline design
+* Partitioned data lake architecture
+* Data transformation (JOIN + GROUP BY)
+* Data validation and quality checks
+* XCom-based task communication
+* Database integration (PostgreSQL)
+* Separation of concerns in pipeline design
+
+---
+
