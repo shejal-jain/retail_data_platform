@@ -1,5 +1,6 @@
 import psycopg2
 import json
+import pandas as pd
 
 def load_customer_sales_to_db(file_path):
     conn = psycopg2.connect(
@@ -11,8 +12,8 @@ def load_customer_sales_to_db(file_path):
 
     cur = conn.cursor()
 
-    with open(file_path,"r") as f:
-        data = json.load(f)
+    df = pd.read_parquet(file_path)
+    data = df.to_dict(orient="records")
 
     for row in data:
         cur.execute("""

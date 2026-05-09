@@ -2,6 +2,7 @@ import json
 import os
 import logging
 from datetime import datetime, UTC
+import pandas as pd
 from retail_data_platform.config.config import ALLOWED_ENTITIES
 from retail_data_platform.ingestion.utils.logger import get_logger
 
@@ -33,6 +34,24 @@ def save_json(data, base_path, entity, run_id, logical_date):
         json.dump(data, f, indent=2)
 
     return file_path
+
+
+def save_parquet(data, base_path, entity, run_id, logical_date):
+    import os
+
+    date_str = logical_date.strftime("%Y-%m-%d")
+
+    folder_path = os.path.join(base_path, entity, date_str)
+    os.makedirs(folder_path, exist_ok=True)
+
+    file_path = os.path.join(folder_path, f"{entity}_{run_id}.parquet")
+
+    df = pd.DataFrame(data)
+
+    df.to_parquet(file_path, index=False)
+
+    return file_path
+
 
 
 def read_csv(file_path):

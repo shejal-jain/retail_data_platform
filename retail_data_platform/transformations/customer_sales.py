@@ -3,6 +3,7 @@ import json
 
 from retail_data_platform.config.config import BASE_DATA_LAKE_PATH
 from retail_data_platform.ingestion.utils.logger import get_logger
+from retail_data_platform.ingestion.loaders.file_loader import save_parquet
 
 logger = get_logger("customer_sales")
 
@@ -140,7 +141,14 @@ def run_customer_sales(run_id, logical_date):
 
     output, valid_orders, invalid_orders = compute_customer_sales(customers, orders)
 
-    file_path = save_analytics(output, run_id, logical_date)
+    file_path = save_parquet(
+        data=output,
+        base_path=BASE_DATA_LAKE_PATH + "/analytics/customer_sales",
+        entity="customer_sales",
+        run_id=run_id,
+        logical_date=logical_date
+    )
+    
     save_quality_report(valid_orders, invalid_orders, run_id, logical_date)
 
     logger.info("Customer Sales Transformation End")
